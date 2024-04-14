@@ -1,5 +1,12 @@
+#!/usr/bin/env python3
+
 # NCAA Bracket predictor
+
+import argparse
 import random
+import sys
+from typing import Optional
+
 
 def win_loss(probability):
     """
@@ -9,6 +16,7 @@ def win_loss(probability):
     :returns: A boolean indicating if the team wins.
     """
     return random.random() < probability
+
 
 def advance_seeds(init_seeds, prob_list):
     # Play a list of initial seeded teams against each other and return list of advancing teams by seed
@@ -30,6 +38,7 @@ def advance_seeds(init_seeds, prob_list):
             new_seeds.append(opponent_seed)
 
     return new_seeds
+
 
 def advance_team(seeds, regions, prob_list):
     # Needed for individual Final Four and Final games where equal seeds can meet
@@ -53,6 +62,7 @@ def advance_team(seeds, regions, prob_list):
             winning_region = regions[better_team]
     return winning_seed, winning_region
 
+
 # list of win probabilities by seed for each round - source: https://www.betfirm.com/seeds-national-championship-odds/
 win_probs = [
     [0.99, 0.93, 0.86, 0.79, 0.65, 0.62, 0.61, 0.49, 0.51, 0.39, 0.38, 0.35, 0.21, 0.14, 0.07, 0.01], # round of 64
@@ -63,7 +73,32 @@ win_probs = [
     [0.65, 0.38, 0.36, 0.50, 0.00, 0.50, 1.00, 0.25, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00] # championship
 ]
 
-def main():
+
+def parse_args(args: Optional[list[str]] = None):
+    parser = argparse.ArgumentParser(
+        description="Predict NCAA tournament results"
+    )
+
+    parser.add_argument(
+        "--seed",
+        help=(
+            "Seed to provide to the random generator. Providing the same seed "
+            "will yield the same results."
+        ),
+    )
+
+    return parser.parse_args(args)
+
+
+def predict_bracket(seed: Optional[str]):
+    if seed is None:
+        # If no seed, generate one that can be passed in to repeat the run in
+        # the future.
+        seed = str(random.randrange(sys.maxsize))
+
+    print("Random seed:", seed)
+    random.seed(seed)
+
     final_four = ['East','West','South','Midwest']  # List of region in the final four
     final_four_seeds = [None, None, None, None]      # Placeholder list for seeds from each region in the final
     final_seeds = [None, None]                      # place holder for regions that made the final
@@ -103,6 +138,14 @@ def main():
     )
     winning_seed, winning_region = advance_team(final_seeds, final_regions, win_probs[5])
     print(f'\nAnd the winner is the {winning_seed} seed from the {winning_region}')
+
+    print("\nTo repeat these results, use the seed:", seed)
+
+
+def main():
+    args = parse_args()
+
+    predict_bracket(args.seed)
 
 
 if __name__ == "__main__":
