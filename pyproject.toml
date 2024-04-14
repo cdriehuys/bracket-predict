@@ -1,0 +1,20 @@
+[tool.poetry]
+package-mode = false
+authors = ["Chathan Driehuys <chathan@driehuys.com>"]
+license = "MIT"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+Django = "^5.0.4"
+django-tailwind = "^3.8.0"
+
+
+[tool.poetry.group.dev.dependencies]
+# Need to keep ruff in sync with the version pinned in `.pre-commit-config.yaml`
+ruff = "~=0.3.7"
+pre-commit = "^3.7.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

@@ -1,0 +1,7 @@
+# Python artifacts
+*.pyc
+__pycache__
+.venv
+
+# Django
+*.sqlite3

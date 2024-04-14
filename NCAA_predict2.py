@@ -37,12 +37,12 @@ def advance_teams(teams: list[Team], prob_list: list[float]) -> list[Team]:
     # Construct parallel lists for teams and opponents. The top teams are paired
     # with the lowest ranked opponents, ie we iterate from the beginning of the
     # list for the first team and the back of the list for their opponent.
-    top_teams = teams[:num_teams//2]
-    opponents = teams[:num_teams//2-1:-1]
+    top_teams = teams[: num_teams // 2]
+    opponents = teams[: num_teams // 2 - 1 : -1]
 
     winning_teams = []
     for team, opponent in zip(top_teams, opponents):
-        if win_loss(prob_list[team.seed-1]):
+        if win_loss(prob_list[team.seed - 1]):
             winning_teams.append(team)
         else:
             winning_teams.append(opponent)
@@ -74,19 +74,119 @@ def advance_team(team_a: Team, team_b: Team, prob_list):
 
 # list of win probabilities by seed for each round - source: https://www.betfirm.com/seeds-national-championship-odds/
 win_probs = [
-    [0.99, 0.93, 0.86, 0.79, 0.65, 0.62, 0.61, 0.49, 0.51, 0.39, 0.38, 0.35, 0.21, 0.14, 0.07, 0.01], # round of 64
-    [0.85, 0.67, 0.62, 0.60, 0.53, 0.47, 0.31, 0.22, 0.10, 0.41, 0.45, 0.42, 0.19, 0.09, 0.36, 0.00], # round of 32
-    [0.79, 0.72, 0.49, 0.32, 0.23, 0.36, 0.34, 0.56, 0.63, 0.38, 0.35, 0.09, 0.00, 0.00, 0.25, 0.00], # sweet 16
-    [0.59, 0.47, 0.44, 0.61, 0.75, 0.19, 0.30, 0.67, 0.40, 0.11, 0.56, 0.00, 0.00, 0.00, 0.00, 0.00], # elite 8
-    [0.62, 0.41, 0.65, 0.29, 0.44, 0.67, 0.33, 0.67, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00], # final 4
-    [0.65, 0.38, 0.36, 0.50, 0.00, 0.50, 1.00, 0.25, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00] # championship
+    [
+        0.99,
+        0.93,
+        0.86,
+        0.79,
+        0.65,
+        0.62,
+        0.61,
+        0.49,
+        0.51,
+        0.39,
+        0.38,
+        0.35,
+        0.21,
+        0.14,
+        0.07,
+        0.01,
+    ],  # round of 64
+    [
+        0.85,
+        0.67,
+        0.62,
+        0.60,
+        0.53,
+        0.47,
+        0.31,
+        0.22,
+        0.10,
+        0.41,
+        0.45,
+        0.42,
+        0.19,
+        0.09,
+        0.36,
+        0.00,
+    ],  # round of 32
+    [
+        0.79,
+        0.72,
+        0.49,
+        0.32,
+        0.23,
+        0.36,
+        0.34,
+        0.56,
+        0.63,
+        0.38,
+        0.35,
+        0.09,
+        0.00,
+        0.00,
+        0.25,
+        0.00,
+    ],  # sweet 16
+    [
+        0.59,
+        0.47,
+        0.44,
+        0.61,
+        0.75,
+        0.19,
+        0.30,
+        0.67,
+        0.40,
+        0.11,
+        0.56,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+    ],  # elite 8
+    [
+        0.62,
+        0.41,
+        0.65,
+        0.29,
+        0.44,
+        0.67,
+        0.33,
+        0.67,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+    ],  # final 4
+    [
+        0.65,
+        0.38,
+        0.36,
+        0.50,
+        0.00,
+        0.50,
+        1.00,
+        0.25,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+        0.00,
+    ],  # championship
 ]
 
 
 def parse_args(args: Optional[list[str]] = None):
-    parser = argparse.ArgumentParser(
-        description="Predict NCAA tournament results"
-    )
+    parser = argparse.ArgumentParser(description="Predict NCAA tournament results")
 
     parser.add_argument(
         "--seed",
@@ -108,43 +208,43 @@ def predict_bracket(seed: Optional[str]):
     print("Random seed:", seed)
     random.seed(seed)
 
-    regions = ['East', 'West', 'South', 'Midwest']
+    regions = ["East", "West", "South", "Midwest"]
     final_four_teams = {}
 
     # Play out the four regional tourneys to get the final four listed by seed
     for region in regions:
-        print(f'\nProjected results from the {region} region:')
+        print(f"\nProjected results from the {region} region:")
         teams = [Team(seed, region) for seed in range(1, 17)]
         for round in range(4):
-            teams = advance_teams(teams, win_probs[round]) # advance seeds based on win probabilities for that round
+            teams = advance_teams(
+                teams, win_probs[round]
+            )  # advance seeds based on win probabilities for that round
             print(
-                f'In round {round+1} these teams will advance: '
-                f'{[t.seed for t in teams]}'
+                f"In round {round+1} these teams will advance: "
+                f"{[t.seed for t in teams]}"
             )
 
-        final_four_teams[region] = teams[0] # collect the final four seeds from each region after all rounds
+        final_four_teams[region] = teams[
+            0
+        ]  # collect the final four seeds from each region after all rounds
 
     # Show the Final Four and their Regions - East vs West and South vs Midwest
-    print('\nYour Final Four is:')
+    print("\nYour Final Four is:")
     print(f'The {final_four_teams["East"]} vs the {final_four_teams["West"]}')
-    print(
-        f'The {final_four_teams["South"]} vs the {final_four_teams["Midwest"]}'
-    )
+    print(f'The {final_four_teams["South"]} vs the {final_four_teams["Midwest"]}')
 
     final_teams = [
-        advance_team(
-            final_four_teams["East"], final_four_teams["West"], win_probs[4]
-        ),
+        advance_team(final_four_teams["East"], final_four_teams["West"], win_probs[4]),
         advance_team(
             final_four_teams["South"], final_four_teams["Midwest"], win_probs[4]
-        )
+        ),
     ]
 
     # Play the final and pronounce a winner
-    print('\nYour Championship Game is:')
-    print(f'The {final_teams[0]} vs the {final_teams[1]}')
+    print("\nYour Championship Game is:")
+    print(f"The {final_teams[0]} vs the {final_teams[1]}")
     winner = advance_team(*final_teams, win_probs[5])
-    print(f'\nAnd the winner is the {winner}')
+    print(f"\nAnd the winner is the {winner}")
 
     print("\nTo repeat these results, use the seed:", seed)
 
