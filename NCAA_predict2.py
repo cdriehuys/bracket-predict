@@ -63,42 +63,47 @@ win_probs = [
     [0.65, 0.38, 0.36, 0.50, 0.00, 0.50, 1.00, 0.25, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00] # championship
 ]
 
-final_four = ['East','West','South','Midwest']  # List of region in the final four
-final_four_seeds = [None, None, None, None]      # Placeholder list for seeds from each region in the final
-final_seeds = [None, None]                      # place holder for regions that made the final
-final_regions = [None,None]                     # Place holder for seeds in the final
+def main():
+    final_four = ['East','West','South','Midwest']  # List of region in the final four
+    final_four_seeds = [None, None, None, None]      # Placeholder list for seeds from each region in the final
+    final_seeds = [None, None]                      # place holder for regions that made the final
+    final_regions = [None,None]                     # Place holder for seeds in the final
 
-# Play out the four regional tourneys to get the final four listed by seed
-for region in range(len(final_four)):
-    print(f'\nProjected results from the {final_four[region]} region:')
-    seeds = list(range(1,17)) # first round is just just seeded 1-16
-    for round in range(4):
-        seeds = advance_seeds(seeds, win_probs[round]) # advance seeds based on win probabilities for that round
-        print(f'In round {round+1} these seeds will advance: {seeds}')
-    final_four_seeds[region] = seeds[0] # collect the final four seeds from each region after all rounds
+    # Play out the four regional tourneys to get the final four listed by seed
+    for region in range(len(final_four)):
+        print(f'\nProjected results from the {final_four[region]} region:')
+        seeds = list(range(1,17)) # first round is just just seeded 1-16
+        for round in range(4):
+            seeds = advance_seeds(seeds, win_probs[round]) # advance seeds based on win probabilities for that round
+            print(f'In round {round+1} these seeds will advance: {seeds}')
+        final_four_seeds[region] = seeds[0] # collect the final four seeds from each region after all rounds
 
-# Show the Final Four and their Regions - East vs West and South vs Midwest
-print('\nYour Final Four is:')
-print(
-    f'The {final_four_seeds[0]} seed from the East vs the '
-    f'{final_four_seeds[1]} from the West'
-)
-print(
-    f'The {final_four_seeds[2]} seed from the South vs the '
-    f'{final_four_seeds[3]} from the Midwest'
-)
+    # Show the Final Four and their Regions - East vs West and South vs Midwest
+    print('\nYour Final Four is:')
+    print(
+        f'The {final_four_seeds[0]} seed from the East vs the '
+        f'{final_four_seeds[1]} from the West'
+    )
+    print(
+        f'The {final_four_seeds[2]} seed from the South vs the '
+        f'{final_four_seeds[3]} from the Midwest'
+    )
 
-# Play the two semis and capture the final seeds and regions
-for i in range(2): # step through two semi-final games
-    seeds = [final_four_seeds[2*i], final_four_seeds[2*i+1]]
-    regions = final_four[2*i], final_four[2*i+1]
-    final_seeds[i], final_regions[i] = advance_team(seeds, regions, win_probs[4])
+    # Play the two semis and capture the final seeds and regions
+    for i in range(2): # step through two semi-final games
+        seeds = [final_four_seeds[2*i], final_four_seeds[2*i+1]]
+        regions = final_four[2*i], final_four[2*i+1]
+        final_seeds[i], final_regions[i] = advance_team(seeds, regions, win_probs[4])
 
-# Play the final and pronounce a winner
-print('\nYour Championship Game is:')
-print(
-    f'The {final_seeds[0]} seed from the {final_regions[0]} vs the '
-    f'{final_seeds[1]} seed from the {final_regions[1]}'
-)
-winning_seed, winning_region = advance_team(final_seeds, final_regions, win_probs[5])
-print(f'\nAnd the winner is the {winning_seed} seed from the {winning_region}')
+    # Play the final and pronounce a winner
+    print('\nYour Championship Game is:')
+    print(
+        f'The {final_seeds[0]} seed from the {final_regions[0]} vs the '
+        f'{final_seeds[1]} seed from the {final_regions[1]}'
+    )
+    winning_seed, winning_region = advance_team(final_seeds, final_regions, win_probs[5])
+    print(f'\nAnd the winner is the {winning_seed} seed from the {winning_region}')
+
+
+if __name__ == "__main__":
+    main()
