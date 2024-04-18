@@ -15,7 +15,7 @@ uuid = "^1.30"
 
 [tool.poetry.group.dev.dependencies]
 # Need to keep ruff in sync with the version pinned in `.pre-commit-config.yaml`
-ruff = "~=0.3.7"
+ruff = "~=0.4.0"
 pre-commit = "^3.7.0"
 
 [tool.ruff.lint]
