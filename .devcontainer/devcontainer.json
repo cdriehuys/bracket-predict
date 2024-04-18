@@ -19,7 +19,8 @@
 			"extensions": [
 				"charliermarsh.ruff",
 				"ms-azuretools.vscode-docker",
-				"patbenatar.advanced-new-file"
+				"patbenatar.advanced-new-file",
+				"tamasfe.even-better-toml"
 			]
 		}
 	},

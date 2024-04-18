@@ -1,4 +1,7 @@
+import random
+import sys
 from uuid import uuid4
+
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -44,3 +47,36 @@ class User(TrackedModel, AbstractBaseUser, PermissionsMixin):  # noqa: DJ008
         ordering = ("id",)
         verbose_name = _("user")
         verbose_name_plural = _("users")
+
+
+def generate_random_seed() -> int:
+    return random.randrange(sys.maxsize)
+
+
+class Bracket(TrackedModel):
+    """
+    A bracket prediction.
+    """
+
+    owner = models.ForeignKey(
+        User,
+        help_text=_("The user who owns the bracket."),
+        on_delete=models.CASCADE,
+        related_name="brackets",
+        related_query_name="bracket",
+        verbose_name=_("owner"),
+    )
+    name = models.CharField(
+        help_text=_("A name to identify the bracket."), max_length=100
+    )
+
+    random_seed = models.BigIntegerField(
+        default=generate_random_seed,
+        help_text=_(
+            "The seed used to prime the random number generator for the "
+            "bracket predictor."
+        ),
+    )
+
+    def __str__(self) -> str:
+        return f"bracket '{self.name}'"
