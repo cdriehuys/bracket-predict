@@ -1,5 +1,8 @@
 {
     "editor.formatOnSave": true,
+    "python.analysis.extraPaths": [
+        "bracket_explorer",
+    ],
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff"
     }
