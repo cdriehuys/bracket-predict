@@ -45,6 +45,10 @@ if not SECRET_KEY and DEBUG:
     SECRET_KEY = "django-insecure-1-zr&u_y)$jhtd1ik*epg^psi_i%1x8u1k@=*uhcmbfu7u(1=g"
 
 ALLOWED_HOSTS = env_list("BE_ALLOWED_HOSTS")
+CSRF_TRUSTED_ORIGINS = env_list("BE_CSRF_TRUSTED_ORIGINS")
+
+SESSION_COOKIE_SECURE = env_bool("BE_HTTPS_ENABLED")
+CSRF_COOKIE_SECURE = SESSION_COOKIE_SECURE
 
 
 # Application definition
