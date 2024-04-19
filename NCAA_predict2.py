@@ -5,12 +5,43 @@
 import argparse
 import random
 import sys
+from collections import defaultdict
 from dataclasses import dataclass
+from enum import Enum, unique
 from typing import Optional, Union
 
+
+@unique
+class Round(Enum):
+    SEEDING = 0
+    ROUND_OF_64 = 1
+    ROUND_OF_32 = 2
+    SWEET_16 = 3
+    ELITE_8 = 4
+    FINAL_4 = 5
+    CHAMPIONSHIP = 6
+
+    def __str__(self):
+        match self:
+            case Round.SEEDING:
+                return "Seeding"
+            case Round.ROUND_OF_64:
+                return "Round of 64"
+            case Round.ROUND_OF_32:
+                return "Round of 32"
+            case Round.SWEET_16:
+                return "Sweet 16"
+            case Round.ELITE_8:
+                return "Elite 8"
+            case Round.FINAL_4:
+                return "Final 4"
+            case Round.CHAMPIONSHIP:
+                return "Championship"
+
+
 # list of win probabilities by seed for each round - source: https://www.betfirm.com/seeds-national-championship-odds/
-WIN_PROBABILITIES = [
-    [
+WIN_PROBABILITIES = {
+    Round.ROUND_OF_64: [
         0.99,
         0.93,
         0.86,
@@ -27,8 +58,8 @@ WIN_PROBABILITIES = [
         0.14,
         0.07,
         0.01,
-    ],  # round of 64
-    [
+    ],
+    Round.ROUND_OF_32: [
         0.85,
         0.67,
         0.62,
@@ -45,8 +76,8 @@ WIN_PROBABILITIES = [
         0.09,
         0.36,
         0.00,
-    ],  # round of 32
-    [
+    ],
+    Round.SWEET_16: [
         0.79,
         0.72,
         0.49,
@@ -63,8 +94,8 @@ WIN_PROBABILITIES = [
         0.00,
         0.25,
         0.00,
-    ],  # sweet 16
-    [
+    ],
+    Round.ELITE_8: [
         0.59,
         0.47,
         0.44,
@@ -81,8 +112,8 @@ WIN_PROBABILITIES = [
         0.00,
         0.00,
         0.00,
-    ],  # elite 8
-    [
+    ],
+    Round.FINAL_4: [
         0.62,
         0.41,
         0.65,
@@ -99,8 +130,8 @@ WIN_PROBABILITIES = [
         0.00,
         0.00,
         0.00,
-    ],  # final 4
-    [
+    ],
+    Round.CHAMPIONSHIP: [
         0.65,
         0.38,
         0.36,
@@ -117,8 +148,8 @@ WIN_PROBABILITIES = [
         0.00,
         0.00,
         0.00,
-    ],  # championship
-]
+    ],
+}
 
 
 @dataclass
@@ -138,14 +169,14 @@ class Team:
 
 @dataclass
 class Game:
-    name: str
+    round: Round
 
     left: Optional["Game"] = None
     right: Optional["Game"] = None
     winner: Optional[Team] = None
 
     def as_dict(self):
-        info = {"name": self.name}
+        info = {"round": self.round}
         info["left"] = self.left.as_dict() if self.left else None
         info["right"] = self.right.as_dict() if self.right else None
         info["winner"] = self.winner.as_dict() if self.winner else None
@@ -160,18 +191,17 @@ def region_teams(region: str) -> list[Team]:
 
 
 def build_tournament() -> Game:
-    rounds = ["Final 4", "Elite 8", "Sweet 16", "Round of 32", "Round of 64"]
     regions = ["East", "South", "West", "Midwest"]
 
     region_finals = {}
     for region in regions:
-        games = [Game(name="Seeding", winner=t) for t in region_teams(region)]
+        games = [Game(Round.SEEDING, winner=t) for t in region_teams(region)]
 
         round_num = 1
         while len(games) > 1:
             new_games = []
             for left, right in zip(games[::2], games[1::2], strict=True):
-                new_games.append(Game(name=rounds[-round_num], left=left, right=right))
+                new_games.append(Game(Round(round_num), left=left, right=right))
 
             round_num += 1
             games = new_games
@@ -179,11 +209,11 @@ def build_tournament() -> Game:
         region_finals[region] = games[0]
 
     semis = [
-        Game("Final 4 - East/South", region_finals["East"], region_finals["South"]),
-        Game("Final 4 - West/Midwest", region_finals["West"], region_finals["Midwest"]),
+        Game(Round.FINAL_4, region_finals["East"], region_finals["South"]),
+        Game(Round.FINAL_4, region_finals["West"], region_finals["Midwest"]),
     ]
 
-    finals = Game("Championship", *semis)
+    finals = Game(Round.CHAMPIONSHIP, *semis)
 
     return finals
 
@@ -200,8 +230,10 @@ def win_loss(rand: random.Random, probability: float) -> bool:
     return rand.random() < probability
 
 
-def pick_winner(random: random.Random, team_a: Team, team_b: Team, depth: int) -> Team:
-    probabilities = WIN_PROBABILITIES[-(depth + 1)]
+def pick_winner(
+    random: random.Random, team_a: Team, team_b: Team, round: Round
+) -> Team:
+    probabilities = WIN_PROBABILITIES[round]
 
     teams = [team_a, team_b]
     teams.sort(key=lambda t: t.seed)
@@ -213,17 +245,17 @@ def pick_winner(random: random.Random, team_a: Team, team_b: Team, depth: int) -
     return high
 
 
-def simulate_game(random: random.Random, game: Game, depth=0) -> Game:
+def simulate_game(random: random.Random, game: Game) -> Game:
     if not game.left or not game.right:
         raise ValueError("Cannot simulate a game without both left and right matches.")
 
     if not game.left.winner:
-        game.left = simulate_game(random, game.left, depth + 1)
+        game.left = simulate_game(random, game.left)
 
     if not game.right.winner:
-        game.right = simulate_game(random, game.right, depth + 1)
+        game.right = simulate_game(random, game.right)
 
-    game.winner = pick_winner(random, game.left.winner, game.right.winner, depth)
+    game.winner = pick_winner(random, game.left.winner, game.right.winner, game.round)
 
     return game
 
@@ -243,28 +275,27 @@ def parse_args(args: Optional[list[str]] = None):
 
 
 def collect_display_games(
-    collection: list[list[Team]], round_names: list[str], game: Game, depth: int = 0
+    collection: dict[Round, list[Team]], game: Game, round: Round
 ):
-    if game is None or depth >= len(round_names):
+    if game is None or round.value < Round.ROUND_OF_64.value:
         return
 
-    collect_display_games(collection, round_names, game.left, depth + 1)
-    collect_display_games(collection, round_names, game.right, depth + 1)
+    collect_display_games(collection, game.left, Round(round.value - 1))
+    collect_display_games(collection, game.right, Round(round.value - 1))
 
     if game.winner:
-        collection[depth].append(game.winner)
+        collection[round].append(game.winner)
 
 
 def display_region_results(region: str, game: Game):
-    round_names = ["Elite 8", "Sweet 16", "Round of 32", "Round of 64"]
-    round_results = [[] for _ in round_names]
+    round_results = defaultdict(list)
 
-    collect_display_games(round_results, round_names, game)
+    collect_display_games(round_results, game, Round.FINAL_4)
 
     print(f"\nResults for the {region}:")
-    for round_name, winners in zip(round_names[::-1], round_results[::-1]):
-        seeds = ", ".join(str(t.seed) for t in winners)
-        print(f"  {round_name} winners: {seeds}")
+    for round in [Round.ROUND_OF_32, Round.SWEET_16, Round.ELITE_8]:
+        seeds = ", ".join(str(t.seed) for t in round_results[round])
+        print(f"  {round} teams: {seeds}")
 
     print(f"  {region} winner: {game.winner.seed} seed")
 
