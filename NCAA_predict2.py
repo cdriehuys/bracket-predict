@@ -3,77 +3,13 @@
 # NCAA Bracket predictor
 
 import argparse
-from dataclasses import dataclass
 import random
 import sys
-from typing import Optional
-
-
-@dataclass
-class Team:
-    seed: int
-    region: str
-
-    def __str__(self) -> str:
-        return f"{self.seed} seed from the {self.region}"
-
-
-def win_loss(probability):
-    """
-    Determine if a team wins or loses based on their win probability.
-
-    :param probability: The probability of the team winning.
-    :returns: A boolean indicating if the team wins.
-    """
-    return random.random() < probability
-
-
-def advance_teams(teams: list[Team], prob_list: list[float]) -> list[Team]:
-    # Play a list of initial seeded teams against each other and return list of advancing teams by seed
-    # probList contains list of odds that the associated seed wins
-    # first and last in list play each other in any given round before the final 4
-    num_teams = len(teams)
-
-    # Construct parallel lists for teams and opponents. The top teams are paired
-    # with the lowest ranked opponents, ie we iterate from the beginning of the
-    # list for the first team and the back of the list for their opponent.
-    top_teams = teams[: num_teams // 2]
-    opponents = teams[: num_teams // 2 - 1 : -1]
-
-    winning_teams = []
-    for team, opponent in zip(top_teams, opponents):
-        if win_loss(prob_list[team.seed - 1]):
-            winning_teams.append(team)
-        else:
-            winning_teams.append(opponent)
-
-    return winning_teams
-
-
-def advance_team(team_a: Team, team_b: Team, prob_list):
-    # Needed for individual Final Four and Final games where equal seeds can meet
-    # Takes the 2 seeds and probabilities by seed
-    # Returns the winner
-
-    # For equal seeds, it's a coin flip.
-    if team_a.seed == team_b.seed:
-        if win_loss(0.5):
-            return team_a
-
-        return team_b
-
-    teams = [team_a, team_b]
-    teams.sort(key=lambda t: t.seed, reverse=True)
-
-    better_team, worse_team = teams
-    if win_loss(prob_list[worse_team.seed - 1]):
-        return worse_team
-
-    return better_team
-
+from dataclasses import dataclass
+from typing import Optional, Union
 
 # list of win probabilities by seed for each round - source: https://www.betfirm.com/seeds-national-championship-odds/
-win_probs = [
+WIN_PROBABILITIES = [
     [
         0.99,
         0.93,
@@ -185,6 +121,113 @@ win_probs = [
 ]
 
 
+@dataclass
+class Team:
+    seed: int
+    region: str
+
+    def __str__(self) -> str:
+        return f"{self.seed} seed from the {self.region}"
+
+    def as_dict(self):
+        return {
+            "seed": self.seed,
+            "region": self.region,
+        }
+
+
+@dataclass
+class Game:
+    name: str
+
+    left: Optional["Game"] = None
+    right: Optional["Game"] = None
+    winner: Optional[Team] = None
+
+    def as_dict(self):
+        info = {"name": self.name}
+        info["left"] = self.left.as_dict() if self.left else None
+        info["right"] = self.right.as_dict() if self.right else None
+        info["winner"] = self.winner.as_dict() if self.winner else None
+
+        return info
+
+
+def region_teams(region: str) -> list[Team]:
+    seed_order = [1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15]
+
+    return [Team(seed, region) for seed in seed_order]
+
+
+def build_tournament() -> Game:
+    rounds = ["Final 4", "Elite 8", "Sweet 16", "Round of 32", "Round of 64"]
+    regions = ["East", "South", "West", "Midwest"]
+
+    region_finals = {}
+    for region in regions:
+        games = [Game(name="Seeding", winner=t) for t in region_teams(region)]
+
+        round_num = 1
+        while len(games) > 1:
+            new_games = []
+            for left, right in zip(games[::2], games[1::2], strict=True):
+                new_games.append(Game(name=rounds[-round_num], left=left, right=right))
+
+            round_num += 1
+            games = new_games
+
+        region_finals[region] = games[0]
+
+    semis = [
+        Game("Final 4 - East/South", region_finals["East"], region_finals["South"]),
+        Game("Final 4 - West/Midwest", region_finals["West"], region_finals["Midwest"]),
+    ]
+
+    finals = Game("Championship", *semis)
+
+    return finals
+
+
+def win_loss(rand: random.Random, probability: float) -> bool:
+    """
+    Return a boolean win/loss indicator based on the probability that the team wins.
+
+    :param rand: Random instance to use for generating random numbers.
+    :param probability: The probability that the team wins as a float in the range
+        [0, 1).
+    :returns: ``True`` if the team wins, and ``False`` otherwise.
+    """
+    return rand.random() < probability
+
+
+def pick_winner(random: random.Random, team_a: Team, team_b: Team, depth: int) -> Team:
+    probabilities = WIN_PROBABILITIES[-(depth + 1)]
+
+    teams = [team_a, team_b]
+    teams.sort(key=lambda t: t.seed)
+    high, low = teams
+
+    if win_loss(random, probabilities[low.seed - 1]):
+        return low
+
+    return high
+
+
+def simulate_game(random: random.Random, game: Game, depth=0) -> Game:
+    if not game.left or not game.right:
+        raise ValueError("Cannot simulate a game without both left and right matches.")
+
+    if not game.left.winner:
+        game.left = simulate_game(random, game.left, depth + 1)
+
+    if not game.right.winner:
+        game.right = simulate_game(random, game.right, depth + 1)
+
+    game.winner = pick_winner(random, game.left.winner, game.right.winner, depth)
+
+    return game
+
+
 def parse_args(args: Optional[list[str]] = None):
     parser = argparse.ArgumentParser(description="Predict NCAA tournament results")
 
@@ -199,52 +242,62 @@ def parse_args(args: Optional[list[str]] = None):
     return parser.parse_args(args)
 
 
-def predict_bracket(seed: Optional[str]):
+def collect_display_games(
+    collection: list[list[Team]], round_names: list[str], game: Game, depth: int = 0
+):
+    if game is None or depth >= len(round_names):
+        return
+
+    collect_display_games(collection, round_names, game.left, depth + 1)
+    collect_display_games(collection, round_names, game.right, depth + 1)
+
+    if game.winner:
+        collection[depth].append(game.winner)
+
+
+def display_region_results(region: str, game: Game):
+    round_names = ["Elite 8", "Sweet 16", "Round of 32", "Round of 64"]
+    round_results = [[] for _ in round_names]
+
+    collect_display_games(round_results, round_names, game)
+
+    print(f"\nResults for the {region}:")
+    for round_name, winners in zip(round_names[::-1], round_results[::-1]):
+        seeds = ", ".join(str(t.seed) for t in winners)
+        print(f"  {round_name} winners: {seeds}")
+
+    print(f"  {region} winner: {game.winner.seed} seed")
+
+
+def display_bracket(championship: Game):
+    east_south = championship.left
+    west_midwest = championship.right
+
+    display_region_results("East", east_south.left)
+    display_region_results("South", east_south.right)
+    display_region_results("West", west_midwest.left)
+    display_region_results("Midwest", west_midwest.right)
+
+    print("\nFinal Four results:")
+    print(f"  East/South:   {east_south.winner}")
+    print(f"  West/Midwest: {west_midwest.winner}")
+
+    print(f"\nChampion: {championship.winner}")
+
+
+def predict_bracket(seed: Optional[Union[str, int]]):
     if seed is None:
         # If no seed, generate one that can be passed in to repeat the run in
         # the future.
         seed = str(random.randrange(sys.maxsize))
 
     print("Random seed:", seed)
-    random.seed(seed)
+    local_random = random.Random(seed)
 
-    regions = ["East", "West", "South", "Midwest"]
-    final_four_teams = {}
+    tournament = build_tournament()
+    championship = simulate_game(local_random, tournament)
 
-    # Play out the four regional tourneys to get the final four listed by seed
-    for region in regions:
-        print(f"\nProjected results from the {region} region:")
-        teams = [Team(seed, region) for seed in range(1, 17)]
-        for round in range(4):
-            teams = advance_teams(
-                teams, win_probs[round]
-            )  # advance seeds based on win probabilities for that round
-            print(
-                f"In round {round+1} these teams will advance: "
-                f"{[t.seed for t in teams]}"
-            )
-
-        final_four_teams[region] = teams[
-            0
-        ]  # collect the final four seeds from each region after all rounds
-
-    # Show the Final Four and their Regions - East vs West and South vs Midwest
-    print("\nYour Final Four is:")
-    print(f'The {final_four_teams["East"]} vs the {final_four_teams["West"]}')
-    print(f'The {final_four_teams["South"]} vs the {final_four_teams["Midwest"]}')
-
-    final_teams = [
-        advance_team(final_four_teams["East"], final_four_teams["West"], win_probs[4]),
-        advance_team(
-            final_four_teams["South"], final_four_teams["Midwest"], win_probs[4]
-        ),
-    ]
-
-    # Play the final and pronounce a winner
-    print("\nYour Championship Game is:")
-    print(f"The {final_teams[0]} vs the {final_teams[1]}")
-    winner = advance_team(*final_teams, win_probs[5])
-    print(f"\nAnd the winner is the {winner}")
+    display_bracket(championship)
 
     print("\nTo repeat these results, use the seed:", seed)
 
