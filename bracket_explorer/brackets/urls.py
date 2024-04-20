@@ -3,5 +3,6 @@ from django.urls import path
 from brackets import views
 
 urlpatterns = [
-    path("brackets/<uuid:bracket_id>/", views.bracket_prediction, name="bracket-detail")
+    path("prediction/", views.random_prediction, name="random-prediction"),
+    path("prediction/<str:seed>/", views.bracket_prediction, name="bracket-prediction"),
 ]

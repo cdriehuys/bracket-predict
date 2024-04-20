@@ -6,6 +6,27 @@
   </head>
 
   <body>
-    <h1>Hello, World!</h1>
+    <h1>Predicted Results</h1>
+    <p>Using random seed: {{ seed }}</p>
+    <p><a href="{% url 'random-prediction' %}">New seed</a></p>
+
+    <h2>Regional Results</h2>
+    {% for region, rounds in results.regions.items %}
+      <h3>{{ region }}:</h3>
+      <ul>
+        {% for round, games in rounds.items %}
+          <li>{{ round }} winning seed(s): {% for game in games %}{% if not forloop.first %}{% if forloop.last %}, and {% else %}, {% endif %}{% endif %}{{ game.winner.seed }}{% endfor %}</li>
+        {% endfor %}
+      </ul>
+    {% endfor %}
+
+    <h2>Final Four</h2>
+    <ul>
+      <li>East/South: {{ results.final_4.east_south.winner }}</li>
+      <li>West/Midwest: {{ results.final_4.west_midwest.winner }}</li>
+    </ul>
+
+    <h2>Championship</h2>
+    <h3>Your predicted champion is the {{ results.championship.winner }}</h3>
   </body>
 </html>

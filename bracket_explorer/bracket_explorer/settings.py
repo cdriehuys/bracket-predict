@@ -176,14 +176,27 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": "[{levelname}] {asctime} {module} {message}",
+            "style": "{",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter": "default",
         },
     },
     "root": {
         "handlers": ["console"],
         "level": "WARNING",
+    },
+    "loggers": {
+        "brackets": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
     },
 }
 

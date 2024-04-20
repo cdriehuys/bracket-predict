@@ -1,18 +1,28 @@
-#!/usr/bin/env python3
-
 # NCAA Bracket predictor
 
-import argparse
 import random
-import sys
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum, unique
-from typing import Optional, Union
+from typing import Optional
+
+
+@unique
+class Regions(Enum):
+    EAST = "East"
+    SOUTH = "South"
+    WEST = "West"
+    MIDWEST = "Midwest"
+
+    def __str__(self):
+        return self.value
 
 
 @unique
 class Round(Enum):
+    # NOTE: There is code that relies on the numeric comparisons of round values, and
+    # the fact that later rounds have higher values than lower ones.
+
     SEEDING = 0
     ROUND_OF_64 = 1
     ROUND_OF_32 = 2
@@ -155,16 +165,10 @@ WIN_PROBABILITIES = {
 @dataclass
 class Team:
     seed: int
-    region: str
+    region: Regions
 
     def __str__(self) -> str:
         return f"{self.seed} seed from the {self.region}"
-
-    def as_dict(self):
-        return {
-            "seed": self.seed,
-            "region": self.region,
-        }
 
 
 @dataclass
@@ -175,26 +179,43 @@ class Game:
     right: Optional["Game"] = None
     winner: Optional[Team] = None
 
-    def as_dict(self):
-        info = {"round": self.round}
-        info["left"] = self.left.as_dict() if self.left else None
-        info["right"] = self.right.as_dict() if self.right else None
-        info["winner"] = self.winner.as_dict() if self.winner else None
 
-        return info
+@dataclass
+class Final4Predictions:
+    east_south: Game
+    west_midwest: Game
 
 
-def region_teams(region: str) -> list[Team]:
+@dataclass
+class Prediction:
+    regions: dict[Regions, dict[Round, list[Game]]]
+    final_4: Final4Predictions
+    championship: Game
+
+
+def region_teams(region: Regions) -> list[Team]:
+    """
+    Construct team representations for a region.
+
+    The team list is ordered by pairs that match up in the first round such that a
+    balanced tree can be created with these teams as the leaf nodes, and the games will
+    be played out as they are in the actual tournament.
+    """
     seed_order = [1, 16, 8, 9, 5, 12, 4, 13, 6, 11, 3, 14, 7, 10, 2, 15]
 
     return [Team(seed, region) for seed in seed_order]
 
 
 def build_tournament() -> Game:
-    regions = ["East", "South", "West", "Midwest"]
+    """
+    Construct the tree of games representing the NCAA tournament.
+    """
+    # The easiest way to think about building the tournament is to construct each
+    # regional tournament, then create the semis and finals manually with the desired
+    # region matchups.
 
     region_finals = {}
-    for region in regions:
+    for region in Regions:
         games = [Game(Round.SEEDING, winner=t) for t in region_teams(region)]
 
         round_num = 1
@@ -209,8 +230,10 @@ def build_tournament() -> Game:
         region_finals[region] = games[0]
 
     semis = [
-        Game(Round.FINAL_4, region_finals["East"], region_finals["South"]),
-        Game(Round.FINAL_4, region_finals["West"], region_finals["Midwest"]),
+        Game(Round.FINAL_4, region_finals[Regions.EAST], region_finals[Regions.SOUTH]),
+        Game(
+            Round.FINAL_4, region_finals[Regions.WEST], region_finals[Regions.MIDWEST]
+        ),
     ]
 
     finals = Game(Round.CHAMPIONSHIP, *semis)
@@ -233,12 +256,26 @@ def win_loss(rand: random.Random, probability: float) -> bool:
 def pick_winner(
     random: random.Random, team_a: Team, team_b: Team, round: Round
 ) -> Team:
+    """
+    Pick a winning team for a particular game.
+
+    :param random: The random generator used to test probabilities.
+    :param team_a: The first team from the game.
+    :param team_b: The second team from the game.
+    :param round: The round the game is being played in.
+    :returns: The team picked to be the winner.
+    """
     probabilities = WIN_PROBABILITIES[round]
 
     teams = [team_a, team_b]
     teams.sort(key=lambda t: t.seed)
     high, low = teams
 
+    # There are opportunities here to try out different strategies for picking winners.
+    # - Based solely on lower seed's probability
+    # - Based solely on higher seed's probability
+    # - Use either high or low seed probability depending on which round we're in
+    # - Run both high and low probabilities until they agree
     if win_loss(random, probabilities[low.seed - 1]):
         return low
 
@@ -246,8 +283,18 @@ def pick_winner(
 
 
 def simulate_game(random: random.Random, game: Game) -> Game:
+    """
+    Simulate a game to predict winners.
+
+    If the games leading to this one have not been simulated yet, they will be simulated
+    first.
+    """
+
     if not game.left or not game.right:
         raise ValueError("Cannot simulate a game without both left and right matches.")
+
+    # Classic recursive operation. Traverse this node's left and right trees to ensure
+    # they have winners before computing the result for this node.
 
     if not game.left.winner:
         game.left = simulate_game(random, game.left)
@@ -260,84 +307,52 @@ def simulate_game(random: random.Random, game: Game) -> Game:
     return game
 
 
-def parse_args(args: Optional[list[str]] = None):
-    parser = argparse.ArgumentParser(description="Predict NCAA tournament results")
-
-    parser.add_argument(
-        "--seed",
-        help=(
-            "Seed to provide to the random generator. Providing the same seed "
-            "will yield the same results."
-        ),
-    )
-
-    return parser.parse_args(args)
-
-
-def collect_display_games(
-    collection: dict[Round, list[Team]], game: Game, round: Round
+def collect_games_by_round(
+    game: Game,
+    collection: dict[Round, list[Game]] = None,
+    lowest_round: Round = Round.ROUND_OF_64,
 ):
-    if game is None or round.value < Round.ROUND_OF_64.value:
+    """
+    Collect games into a structure that's easier to display results from.
+
+    A tree makes sense for showing dependencies between games, but when showing results,
+    we often want to collect games by round. This function collects games into a map of
+    rounds to games.
+
+    :param collection: The collection of games. This is modified in-place.
+    :param game: The game to add to the collection. The game's descendents will all be
+        added as well.
+    :param lowest_round: The lowest round to collect results for. Defaults to the round
+        of 32 as that is the first round after some teams have been eliminated.
+    """
+    if collection is None:
+        collection = defaultdict(list)
+
+    if game is None or game.round.value < lowest_round.value:
         return
 
-    collect_display_games(collection, game.left, Round(round.value - 1))
-    collect_display_games(collection, game.right, Round(round.value - 1))
+    collect_games_by_round(game.left, collection, lowest_round)
+    collect_games_by_round(game.right, collection, lowest_round)
 
-    if game.winner:
-        collection[round].append(game.winner)
+    collection[game.round].append(game)
 
-
-def display_region_results(region: str, game: Game):
-    round_results = defaultdict(list)
-
-    collect_display_games(round_results, game, Round.FINAL_4)
-
-    print(f"\nResults for the {region}:")
-    for round in [Round.ROUND_OF_32, Round.SWEET_16, Round.ELITE_8]:
-        seeds = ", ".join(str(t.seed) for t in round_results[round])
-        print(f"  {round} teams: {seeds}")
-
-    print(f"  {region} winner: {game.winner.seed} seed")
+    return dict(collection)
 
 
-def display_bracket(championship: Game):
+def collect_results(championship: Game) -> Prediction:
+    """
+    Collect results into a dictionary structure that's easier to iterate through.
+    """
     east_south = championship.left
     west_midwest = championship.right
 
-    display_region_results("East", east_south.left)
-    display_region_results("South", east_south.right)
-    display_region_results("West", west_midwest.left)
-    display_region_results("Midwest", west_midwest.right)
-
-    print("\nFinal Four results:")
-    print(f"  East/South:   {east_south.winner}")
-    print(f"  West/Midwest: {west_midwest.winner}")
-
-    print(f"\nChampion: {championship.winner}")
-
-
-def predict_bracket(seed: Optional[Union[str, int]]):
-    if seed is None:
-        # If no seed, generate one that can be passed in to repeat the run in
-        # the future.
-        seed = str(random.randrange(sys.maxsize))
-
-    print("Random seed:", seed)
-    local_random = random.Random(seed)
-
-    tournament = build_tournament()
-    championship = simulate_game(local_random, tournament)
-
-    display_bracket(championship)
-
-    print("\nTo repeat these results, use the seed:", seed)
-
-
-def main():
-    args = parse_args()
-
-    predict_bracket(args.seed)
-
-
-if __name__ == "__main__":
-    main()
+    return Prediction(
+        {
+            Regions.EAST: collect_games_by_round(east_south.left),
+            Regions.SOUTH: collect_games_by_round(east_south.right),
+            Regions.WEST: collect_games_by_round(west_midwest.left),
+            Regions.MIDWEST: collect_games_by_round(west_midwest.right),
+        },
+        Final4Predictions(east_south, west_midwest),
+        championship,
+    )
