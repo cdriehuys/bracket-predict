@@ -5,3 +5,6 @@ __pycache__
 
 # Django
 *.sqlite3
+
+# Built CSS
+bracket_explorer/theme/static/css/dist/styles.css
