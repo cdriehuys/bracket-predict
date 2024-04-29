@@ -12,7 +12,10 @@ web:
 ```
 
 Next, make sure `.vault-password` contains the password for decrypting the
-Ansible vault.
+Ansible vault. Finally, install the used Ansible collections:
+```shell
+ansible-galaxy install -r requirements.yml
+```
 
 ## Deploying
 

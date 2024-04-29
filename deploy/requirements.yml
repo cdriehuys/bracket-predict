@@ -1,0 +1,5 @@
+collections:
+  # Install a collection from Ansible Galaxy.
+  - name: community.postgresql
+    version: ">=3.4.0,<4.0.0"
+    source: https://galaxy.ansible.com
