@@ -1,0 +1,21 @@
+[Unit]
+Description=Bracket Explorer gunicorn daemon
+Requires=bracket-explorer.socket
+After=network.target
+
+[Service]
+Type=notify
+# the specific user that our service will run as
+User=bracket-explorer
+Group=bracket-explorer
+EnvironmentFile=/etc/bracket-explorer/environment
+RuntimeDirectory=bracket-explorer
+WorkingDirectory=/opt/bracket-explorer/bracket_explorer
+ExecStart=/usr/local/bin/poetry run gunicorn bracket_explorer.wsgi
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

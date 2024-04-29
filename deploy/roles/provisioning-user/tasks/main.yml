@@ -1,0 +1,12 @@
+---
+- name: Test connection with '{{ provisioning_original_user }}'
+  remote_user: "{{ provisioning_original_user }}"
+  ansible.builtin.ping:
+  register: original_ping
+  ignore_errors: true
+
+- name: Ensure provisioning user exists
+  include_tasks: create-provisioning-user.yml
+  when: >
+    original_ping is success and
+    ('unreachable' not in original_ping or not original_ping.unreachable)

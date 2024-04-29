@@ -1,0 +1,3 @@
+# Information that shouldn't be added to the repository
+inventory.yml
+.vault-password

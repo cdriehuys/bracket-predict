@@ -1,0 +1,13 @@
+[Unit]
+Description=Bracket Explorer socket
+
+[Socket]
+ListenStream=/run/bracket-explorer.sock
+# Our service won't need permissions for the socket, since it
+# inherits the file descriptor by socket activation
+# only Caddy will need access to the socket
+SocketUser=caddy
+SocketMode=600
+
+[Install]
+WantedBy=sockets.target

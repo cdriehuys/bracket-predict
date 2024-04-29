@@ -18,6 +18,7 @@
 		"vscode": {
 			"extensions": [
 				"charliermarsh.ruff",
+				"matthewpi.caddyfile-support",
 				"ms-azuretools.vscode-docker",
 				"patbenatar.advanced-new-file",
 				"tamasfe.even-better-toml"

@@ -1,0 +1,8 @@
+bracketexplorer.com, www.bracketexplorer.com {
+	handle_path /static/* {
+		root * {{ be_static_dir }}/
+		file_server
+	}
+
+	reverse_proxy unix//run/bracket-explorer.sock
+}

@@ -1,0 +1,172 @@
+---
+- name: Install system dependencies
+  become: true
+  ansible.builtin.package:
+    name:
+      - pipx
+      - postgresql-15
+      # Poetry needs 'python': https://github.com/python-poetry/poetry/issues/6371
+      - python-is-python3
+      - python3-pip
+      - python3-venv
+      - python3.12
+    state: present
+
+# Adapted from Caddy installation instructions:
+# https://caddyserver.com/docs/install#debian-ubuntu-raspbian
+- name: Add Caddy apt repo
+  become: true
+  block:
+    - name: Caddy | apt key
+      ansible.builtin.get_url:
+        url: https://dl.cloudsmith.io/public/caddy/stable/gpg.key
+        dest: /etc/apt/keyrings/caddy-stable.asc
+        mode: '644'
+        checksum: sha256:5791c2fb6b6e82feb5a69834dd2131f4bcc30af0faec37783b2dc1c5c224a82a
+
+    # This takes forever to run. It seems to eventually complete successfully
+    # though.
+    - name: Caddy | apt source
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/caddy-stable.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main"
+        state: present
+
+- name: Install Caddy
+  become: true
+  ansible.builtin.apt:
+    name: caddy
+    state: present
+
+- name: Add Node apt repo
+  become: true
+  block:
+    - name: Node | apt key
+      ansible.builtin.get_url:
+        url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+        dest: /etc/apt/keyrings/nodesource.asc
+        mode: "644"
+
+    - name: Node | apt source
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64 signed-by=/etc/apt/keyrings/nodesource.asc] https://deb.nodesource.com/node_20.x nodistro main"
+        state: present
+
+- name: Install Node
+  become: true
+  ansible.builtin.apt:
+    name: nodejs
+    state: present
+
+- name: Check Poetry version
+  ansible.builtin.command: poetry --version
+  ignore_errors: true
+  changed_when: false
+  register: poetry_version_check
+
+- name: Install Poetry
+  become: true
+  environment:
+    PIPX_HOME: /opt/pipx
+    PIPX_BIN_DIR: /usr/local/bin
+    PIPX_MAN_DIR: /usr/local/share/man
+  ansible.builtin.command: pipx install {{ 'poetry==' + poetry_version | quote }}
+  when: >
+    poetry_version_check is failed or
+    poetry_version not in poetry_version_check.stdout
+
+- name: Create application user
+  become: true
+  ansible.builtin.user:
+    name: bracket-explorer
+    create_home: false
+
+- name: Ensure application directory exists
+  become: true
+  ansible.builtin.file:
+    path: /opt/bracket-explorer
+    state: directory
+    owner: bracket-explorer
+    group: bracket-explorer
+
+- name: Create app configuration directory
+  become: true
+  ansible.builtin.file:
+    path: /etc/bracket-explorer
+    state: directory
+    mode: "755"
+    owner: bracket-explorer
+    group: bracket-explorer
+
+- name: Configure app environment variables
+  become: true
+  ansible.builtin.template:
+    src: environment
+    dest: /etc/bracket-explorer/environment
+    mode: "600"
+    owner: bracket-explorer
+    group: bracket-explorer
+  register: environment_upload
+
+- name: Create media file directory
+  become: true
+  ansible.builtin.file:
+    path: /srv/bracket-explorer/media
+    state: directory
+    mode: u=rwX,g=rX,o=rX
+    recurse: true
+
+- name: Create static file directory
+  become: true
+  ansible.builtin.file:
+    path: "{{ be_static_dir }}"
+    state: directory
+    mode: u=rwX,g=rX,o=rX
+    recurse: true
+
+- name: Upload Systemd configurations
+  become: true
+  block:
+    - name: bracket-explorer | service
+      ansible.builtin.copy:
+        src: bracket-explorer.service
+        dest: /etc/systemd/system/bracket-explorer.service
+        mode: "644"
+      register: service_file
+
+    - name: bracket-explorer | socket
+      ansible.builtin.copy:
+        src: bracket-explorer.socket
+        dest: /etc/systemd/system/bracket-explorer.socket
+        mode: "644"
+      register: socket_file
+
+- name: Enable bracket-explorer socket
+  become: true
+  ansible.builtin.systemd_service:
+    daemon_reload: "{{ service_file is changed or socket_file is changed }}"
+    name: bracket-explorer.socket
+    enabled: true
+    state: "{{ 'restarted' if service_file is changed or socket_file is changed else 'started' }}"
+
+- name: Upload Caddyfile
+  become: true
+  ansible.builtin.template:
+    src: Caddyfile
+    dest: /etc/caddy/Caddyfile
+    validate: /usr/bin/caddy validate --adapter caddyfile --config %s
+  register: caddyfile
+
+- name: Reload Caddy
+  become: true
+  ansible.builtin.systemd_service:
+    name: caddy
+    state: "{{ 'reloaded' if caddyfile is changed else 'started' }}"
+
+- name: Upload deploy script
+  become: true
+  ansible.builtin.copy:
+    src: deploy.sh
+    dest: /home/ansible/deploy.sh
+    mode: "744"
+    owner: ansible
+    group: ansible

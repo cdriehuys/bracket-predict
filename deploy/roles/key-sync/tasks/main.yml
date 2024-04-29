@@ -1,0 +1,47 @@
+---
+- name: Install curl
+  become: true
+  ansible.builtin.package:
+    name: curl
+    state: present
+
+- name: Create script to pull keys
+  become: true
+  ansible.builtin.copy:
+    src: pull-keys.sh
+    dest: /usr/local/bin/pull-keys.sh
+    mode: "755"
+
+- name: Create systemd service
+  become: true
+  ansible.builtin.template:
+    src: pull-keys@.service
+    dest: /etc/systemd/system/pull-keys@.service
+    mode: "644"
+  register: systemd_service
+
+- name: Create systemd timer
+  become: true
+  ansible.builtin.copy:
+    src: pull-keys@.timer
+    dest: /etc/systemd/system/pull-keys@.timer
+    mode: "644"
+  register: systemd_timer
+
+# The way we use the systemd timer computes the next trigger time based on the
+# last execution time for the service. We need to either reboot the machine or
+# start a run manually in order for the timer to function.
+- name: Run task to pull keys
+  become: true
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: pull-keys@{{ ansible_user_id }}
+    state: started
+  when: systemd_service.changed or systemd_timer.changed
+
+- name: Enable and start systemd timer
+  become: true
+  ansible.builtin.systemd:
+    name: pull-keys@{{ ansible_user_id }}.timer
+    enabled: true
+    state: started

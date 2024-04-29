@@ -1,0 +1,29 @@
+---
+- name: Create provisioning user
+  hosts: all
+  gather_facts: false
+
+  ignore_unreachable: true
+  remote_user: ansible
+
+  roles:
+    - role: provisioning-user
+      provisioning_original_user: root
+      provisioning_user: ansible
+      authorized_keys_url: https://raw.githubusercontent.com/cdriehuys/public-keys/main/keys
+
+- name: Provision web servers
+  hosts: web
+
+  remote_user: ansible
+
+  roles:
+    # - role: key-sync
+    #   key_sync_url: https://raw.githubusercontent.com/cdriehuys/public-keys/main/keys
+    # - ssh-harden
+    - role: bracket-explorer-provision
+      be_db_password: "{{ secret_db_password }}"
+      be_domains:
+        - www.bracketexplorer.com
+        - bracketexplorer.com
+      be_secret_key: "{{ secret_secret_key }}"

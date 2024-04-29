@@ -1,0 +1,4 @@
+---
+be_static_dir: /srv/bracket-explorer/static
+
+poetry_version: "1.8.2"

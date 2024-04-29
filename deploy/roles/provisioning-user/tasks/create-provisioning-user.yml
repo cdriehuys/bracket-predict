@@ -1,0 +1,50 @@
+---
+- name: Install 'sudo' utility
+  remote_user: "{{ provisioning_original_user }}"
+  ansible.builtin.package:
+    name: sudo
+    state: present
+
+- name: Create provisioning user
+  remote_user: "{{ provisioning_original_user }}"
+  user:
+    groups: sudo
+    name: "{{ provisioning_user }}"
+
+- name: Enable password-less sudo
+  remote_user: "{{ provisioning_original_user }}"
+  lineinfile:
+    path: /etc/sudoers
+    state: present
+    regexp: '^{{ provisioning_user }} ALL='
+    line: '{{ provisioning_user }} ALL=(ALL:ALL) NOPASSWD: ALL'
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Create SSH directory
+  remote_user: "{{ provisioning_original_user }}"
+  ansible.builtin.file:
+    path: /home/{{ provisioning_user }}/.ssh
+    state: directory
+    mode: "700"
+    owner: "{{ provisioning_user }}"
+    group: "{{ provisioning_user }}"
+
+- name: Add authorized keys
+  remote_user: "{{ provisioning_original_user }}"
+  ansible.builtin.get_url:
+    url: "{{ authorized_keys_url }}"
+    dest: /home/{{ provisioning_user }}/.ssh/authorized_keys
+    mode: "600"
+    owner: "{{ provisioning_user }}"
+    group: "{{ provisioning_user }}"
+  when: "authorized_keys_url | default(False)"
+
+# Without enabling PAM, the password-less ansible user cannot log in.
+- name: Enable PAM for SSH
+  remote_user: "{{ provisioning_original_user }}"
+  lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: "^#?UsePAM"
+    line: UsePAM yes
+    validate: sshd -t -f %s
+  notify: restart_sshd

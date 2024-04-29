@@ -9,6 +9,7 @@ python = "^3.12"
 Django = "^5.0.4"
 django-allauth = "^0.61.1"
 django-tailwind = "^3.8.0"
+gunicorn = "^22.0.0"
 psycopg = "^3.1.18"
 uuid = "^1.30"
 
@@ -17,6 +18,7 @@ uuid = "^1.30"
 # Need to keep ruff in sync with the version pinned in `.pre-commit-config.yaml`
 ruff = "~=0.4.0"
 pre-commit = "^3.7.0"
+ansible = "^9.4.0"
 
 [tool.ruff.lint]
 extend-select = [
