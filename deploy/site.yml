@@ -18,9 +18,10 @@
   remote_user: ansible
 
   roles:
-    # - role: key-sync
-    #   key_sync_url: https://raw.githubusercontent.com/cdriehuys/public-keys/main/keys
-    # - ssh-harden
+    - role: key-sync
+      key_sync_url: https://raw.githubusercontent.com/cdriehuys/public-keys/main/keys
+    - ssh-harden
+    - firewall
     - role: bracket-explorer-provision
       be_db_password: "{{ secret_db_password }}"
       be_domains:

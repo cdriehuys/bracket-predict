@@ -1,0 +1,29 @@
+- name: Install UFW
+  become: true
+  ansible.builtin.package:
+    name: ufw
+    state: present
+
+- name: Rate limit SSH traffic
+  become: true
+  community.general.ufw:
+    rule: limit
+    name: OpenSSH
+
+- name: Allow web traffic on port "{{ item }}"
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    # Need port 80 for ACME challenges to obtain an SSL certificate
+    - 80
+    # Normal web traffic is served over HTTPS
+    - 443
+
+- name: Default to denying traffic
+  become: true
+  community.general.ufw:
+    default: deny
+    state: enabled
