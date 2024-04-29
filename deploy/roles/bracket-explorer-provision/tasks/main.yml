@@ -25,7 +25,6 @@
   become: true
   become_user: postgres
   community.postgresql.postgresql_user:
-    db: "{{ be_db_name }}"
     name: "{{ be_db_user }}"
     password: "{{ be_db_password }}"
 
@@ -35,7 +34,8 @@
   community.postgresql.postgresql_privs:
     database: "{{ be_db_name }}"
     roles: "{{ be_db_user }}"
-    type: database
+    type: schema
+    objs: public
     privs: ALL
 
 # Adapted from Caddy installation instructions:

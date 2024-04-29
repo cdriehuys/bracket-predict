@@ -5,7 +5,7 @@ BE_CSRF_TRUSTED_ORIGINS="{{ ['https://'] | product(be_domains) | map('join') | j
 
 BE_HTTPS_ENABLED=true
 
-BE_DB_NAME=bracket_explorer
-BE_DB_USER=bracket_explorer
+BE_DB_NAME="{{ be_db_name }}"
+BE_DB_USER="{{ be_db_user }}"
 BE_DB_PASSWORD="{{ be_db_password }}"
 BE_DB_HOST=localhost
